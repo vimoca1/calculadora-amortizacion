@@ -42,16 +42,22 @@ with col2:
 monthly_rate = tae / 12
 monthly_payment = -npf.pmt(monthly_rate, int(months), principal)
 
-# --- Tabla de amortización
+# --- Simular intereses sin amortizaciones extras
+balance_no_extra = principal
+total_interest_no_extra = 0.0
+for m in range(1, int(months) + 1):
+    interest_no_extra = balance_no_extra * monthly_rate
+    total_interest_no_extra += interest_no_extra
+    principal_payment_no_extra = monthly_payment - interest_no_extra
+    balance_no_extra = max(balance_no_extra - principal_payment_no_extra, 0)
+
+# --- Tabla de amortización con extras
 schedule = []
 balance = principal
-# calculo intereses sin amortizar para comparación
-total_interest_no_extra = 0.0
 
 for m in range(1, int(months) + 1):
-    # interés del mes
+    # interés del mes en escenario con extras
     interest = balance * monthly_rate
-    total_interest_no_extra += interest
     principal_payment = monthly_payment - interest
 
     # calcular amortizaciones extra
