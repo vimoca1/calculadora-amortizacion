@@ -7,8 +7,9 @@ st.set_page_config(page_title="Calculadora de Amortización de Deuda", layout="c
 st.title("📊 Calculadora de Amortización de Deuda")
 
 st.markdown("""
-Esta calculadora te permite comparar amortizaciones puntuales y periódicas de un préstamo 
-con el coste de oportunidad de invertir ese dinero. Incluye cuota, TAE, fechas y recomendaciones.
+Esta calculadora permite comparar amortizaciones puntuales y periódicas de un préstamo 
+frente al coste de oportunidad de invertir ese dinero. Incluye cálculo de cuota, TAE,
+fechas automáticas, ahorro de intereses y recomendación.
 """)
 
 # --- Entradas de usuario
@@ -19,43 +20,60 @@ with col1:
     tae = st.number_input("TAE (%)", value=5.0, step=0.1) / 100
     start_date = st.date_input("Fecha de inicio del préstamo", value=datetime.today())
     extra_once = st.number_input("Amortización puntual (€)", value=0, step=100)
-    month_once = st.number_input("Mes de amortización puntual (1 = primer mes)", value=1, min_value=1, max_value=int(months), step=1)
+    month_once = st.number_input(
+        "Mes de amortización puntual (1 = primer mes)",
+        value=1,
+        min_value=1,
+        max_value=int(months),
+        step=1
+    )
 with col2:
     extra_monthly = st.number_input("Amortización extra mensual (€)", value=0, step=50)
-    start_monthly = st.number_input("Mes de inicio de amortización periódica", value=1, min_value=1, max_value=int(months), step=1)
+    start_monthly = st.number_input(
+        "Mes de inicio de amortización periódica", 
+        value=1,
+        min_value=1,
+        max_value=int(months),
+        step=1
+    )
     alt_return = st.number_input("Rentabilidad alternativa anual (%)", value=5.0, step=0.1) / 100
 
 # --- Cálculo de la cuota mensual
 monthly_rate = tae / 12
-monthly_payment = -npf.pmt(monthly_rate, months, principal)
+monthly_payment = -npf.pmt(monthly_rate, int(months), principal)
 
 # --- Tabla de amortización
 schedule = []
 balance = principal
 # calculo intereses sin amortizar para comparación
-total_interest_no_extra = 0
+total_interest_no_extra = 0.0
 
 for m in range(1, int(months) + 1):
+    # interés del mes
     interest = balance * monthly_rate
     total_interest_no_extra += interest
     principal_payment = monthly_payment - interest
 
-    # amortizaciones extra
-    extra = 0
+    # calcular amortizaciones extra
+    extra = 0.0
     if m == month_once:
         extra += extra_once
     if m >= start_monthly:
         extra += extra_monthly
 
-    # aplicar pagos\ n    total_principal = principal_payment + extra
+    # total de principal pagado este mes
+    total_principal = principal_payment + extra
+    # nuevo saldo
     new_balance = max(balance - total_principal, 0)
 
-    # coste de oportunidad del extra
-    opp_cost = extra * ((1 + alt_return / 12) ** (months - m + 1) - 1) if extra > 0 else 0
+    # coste de oportunidad del extra adelantado
+    opp_cost = 0.0
+    if extra > 0:
+        opp_cost = extra * ((1 + alt_return / 12) ** (int(months) - m + 1) - 1)
 
     schedule.append({
         "Mes": m,
-        "Fecha": (start_date + timedelta(days=30*m)).strftime("%Y-%m-%d"),
+        "Fecha": (start_date + timedelta(days=30 * m)).strftime("%Y-%m-%d"),
         "Saldo inicial": round(balance, 2),
         "Interés": round(interest, 2),
         "Cuota": round(monthly_payment, 2),
@@ -74,7 +92,7 @@ df = pd.DataFrame(schedule)
 st.subheader("Cuadro de amortización")
 st.dataframe(df, use_container_width=True)
 
-# calcular totales
+# --- Cálculos de totales
 total_interest_with_extra = df["Interés"].sum()
 interests_saved = total_interest_no_extra - total_interest_with_extra
 total_extra = df["Amortiz. anticipada"].sum()
@@ -87,10 +105,9 @@ st.markdown(f"""
 - **Intereses ahorrados:** €{interests_saved:,.2f}  
 - **Total amortizado anticipadamente:** €{total_extra:,.2f}  
 - **Coste de oportunidad:** €{total_opp_cost:,.2f}  
-"""
-)
+""")
 
-# recomendación final
+# --- Recomendación final
 if interests_saved > total_opp_cost:
     st.success("✅ Te conviene amortizar: ahorras más intereses que el coste de oportunidad.")
 else:
